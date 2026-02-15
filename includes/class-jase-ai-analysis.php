@@ -9,15 +9,15 @@ class JASE_AI_Analysis {
         $this->api_key = JASE_Settings::get_openai_key();
     }
 
-    private function chat_completion( $messages, $max_tokens = 2048, $temperature = 0.3 ) {
+    private function chat_completion( $messages, $max_tokens = 2048, $temperature = 0.3, $model = 'gpt-4o-mini' ) {
         $response = wp_remote_post( 'https://api.openai.com/v1/chat/completions', [
-            'timeout' => 60,
+            'timeout' => 120,
             'headers' => [
                 'Authorization' => 'Bearer ' . $this->api_key,
                 'Content-Type'  => 'application/json',
             ],
             'body' => wp_json_encode( [
-                'model'       => 'gpt-4o-mini',
+                'model'       => $model,
                 'messages'    => $messages,
                 'max_tokens'  => $max_tokens,
                 'temperature' => $temperature,
@@ -134,7 +134,7 @@ class JASE_AI_Analysis {
             ],
         ];
 
-        return $this->chat_completion( $messages, 100, 0.7 );
+        return $this->chat_completion( $messages, 100, 0.7, 'gpt-4o' );
     }
 
     public function generate_content( $title, $keyword, $questions, $sitemap_urls = '' ) {
@@ -148,21 +148,21 @@ class JASE_AI_Analysis {
 
         $linking_section = '';
         if ( ! empty( $sitemap_urls ) ) {
-            $linking_section = "\n\nAVAILABLE INTERNAL LINKS (use 3-5 naturally):\n{$sitemap_urls}";
+            $linking_section = "\n\nINTERNAL LINKING REQUIREMENT:\nYou MUST include 4-5 internal links from the list below. Choose the most relevant URLs and link them naturally within the body text using descriptive anchor text (not \"click here\"). Spread links throughout the article, not all in one section.\n\nAvailable URLs:\n{$sitemap_urls}";
         }
 
         $messages = [
             [
                 'role'    => 'system',
-                'content' => "You are an expert content writer. Create comprehensive, SEO-optimized blog posts. Write in a helpful, authoritative tone. Your articles should:\n- Use HTML headings (h1, h2, h3) for structure\n- Include practical, actionable advice\n- Include an FAQ section\n- Be 1500-2000 words\n- Use conversational but professional tone\n- Output clean HTML without markdown formatting\n- Include internal links naturally if URLs are provided",
+                'content' => "You are an expert SEO content writer who follows Google's E-E-A-T guidelines. Create comprehensive, SEO-optimized blog posts. Your articles must:\n- Use HTML headings (h2, h3) for structure — do NOT use h1 (WordPress adds it from the title)\n- Include practical, actionable advice with real examples\n- Include an FAQ section with schema-friendly markup\n- Be 1800-2500 words\n- Use conversational but professional tone\n- Output clean HTML without markdown formatting\n- Include internal links naturally using descriptive anchor text\n- Use the target keyword naturally 3-5 times (no keyword stuffing)\n- Include a compelling introduction and conclusion",
             ],
             [
                 'role'    => 'user',
-                'content' => "Write a comprehensive blog post.\n\nTitle: {$title}\nTarget keyword: {$keyword}\n\n{$question_section}{$linking_section}\n\nUse HTML tags (h1, h2, h3, p, strong, ul, li, a). No markdown. No code blocks. Output clean HTML directly.",
+                'content' => "Write a comprehensive blog post.\n\nTitle: {$title}\nTarget keyword: {$keyword}\n\n{$question_section}{$linking_section}\n\nUse HTML tags (h2, h3, p, strong, ul, li, a). No markdown. No code blocks. No h1 tag. Output clean HTML directly.",
             ],
         ];
 
-        return $this->chat_completion( $messages, 4000, 0.5 );
+        return $this->chat_completion( $messages, 4096, 0.5, 'gpt-4o' );
     }
 
     public function suggest_image_prompts( $title, $keyword ) {

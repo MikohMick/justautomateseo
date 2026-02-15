@@ -31,6 +31,8 @@ class JASE_Ajax_Handler {
 
         // Content Generation
         add_action( 'wp_ajax_jase_generate_content', [ $this, 'generate_content' ] );
+        add_action( 'wp_ajax_jase_generate_single_content', [ $this, 'generate_single_content' ] );
+        add_action( 'wp_ajax_jase_check_cannibalization', [ $this, 'check_cannibalization' ] );
     }
 
     private function verify_nonce() {
@@ -382,16 +384,7 @@ class JASE_Ajax_Handler {
 
         $ai        = new JASE_AI_Analysis();
         $generator = new JASE_Content_Generator();
-
-        // Get sitemap URLs for internal linking
-        $sitemap_url  = JASE_Settings::get( 'sitemap_url', '' );
-        $sitemap_urls = '';
-        if ( ! empty( $sitemap_url ) ) {
-            $urls = $generator->fetch_sitemap_urls( $sitemap_url );
-            if ( ! is_wp_error( $urls ) ) {
-                $sitemap_urls = implode( "\n", array_slice( $urls, 0, 30 ) );
-            }
-        }
+        $sitemap_urls = $this->get_shuffled_sitemap_urls();
 
         $created_posts = [];
 
@@ -443,6 +436,9 @@ class JASE_Ajax_Handler {
                     'error'    => $post_id->get_error_message(),
                 ];
             } else {
+                // Store parent keyword as post meta for cannibalization tracking
+                update_post_meta( $post_id, '_jase_parent_keyword', sanitize_text_field( $parent_keyword ) );
+
                 $created_posts[] = [
                     'question' => $question_text,
                     'post_id'  => $post_id,
@@ -466,5 +462,169 @@ class JASE_Ajax_Handler {
         update_option( 'jase_setup_complete', true );
 
         wp_send_json_success( [ 'posts' => $created_posts ] );
+    }
+
+    /**
+     * Generate a single article (called from frontend queue).
+     */
+    public function generate_single_content() {
+        $this->verify_nonce();
+
+        $question     = isset( $_POST['question'] ) ? json_decode( wp_unslash( $_POST['question'] ), true ) : null;
+        $category_id  = isset( $_POST['category_id'] ) ? absint( $_POST['category_id'] ) : 0;
+        $post_status  = isset( $_POST['post_status'] ) ? sanitize_text_field( wp_unslash( $_POST['post_status'] ) ) : 'draft';
+        $auto_images  = isset( $_POST['auto_images'] ) && $_POST['auto_images'] === 'true';
+
+        if ( empty( $question ) ) {
+            wp_send_json_error( [ 'message' => 'No question provided' ] );
+        }
+
+        $question_text  = is_array( $question ) ? ( $question['text'] ?? '' ) : $question;
+        $parent_keyword = is_array( $question ) ? ( $question['parent_keyword'] ?? $question_text ) : $question_text;
+
+        if ( empty( $question_text ) ) {
+            wp_send_json_error( [ 'message' => 'Empty question text' ] );
+        }
+
+        // Cannibalization check
+        $existing_count = $this->count_keyword_articles( $parent_keyword );
+        if ( $existing_count >= 3 ) {
+            wp_send_json_error( [
+                'message'          => 'Keyword limit reached: "' . $parent_keyword . '" already has ' . $existing_count . ' articles. To avoid keyword cannibalization (competing with your own content in search results), choose a different topic.',
+                'cannibalization'  => true,
+                'existing_count'   => $existing_count,
+                'keyword'          => $parent_keyword,
+            ] );
+        }
+
+        $ai        = new JASE_AI_Analysis();
+        $generator = new JASE_Content_Generator();
+        $sitemap_urls = $this->get_shuffled_sitemap_urls();
+
+        // Generate title
+        $title = $ai->generate_title( $question_text );
+        if ( is_wp_error( $title ) ) {
+            $title = ucfirst( $question_text );
+        }
+        $title = trim( str_replace( '"', '', $title ) );
+
+        // Generate content
+        $content = $ai->generate_content( $title, $parent_keyword, [ $question_text ], $sitemap_urls );
+        if ( is_wp_error( $content ) ) {
+            wp_send_json_error( [ 'message' => $content->get_error_message(), 'question' => $question_text ] );
+        }
+
+        // Clean content
+        $content = preg_replace( '/^```html\s*/s', '', $content );
+        $content = preg_replace( '/\s*```$/s', '', $content );
+
+        // Handle featured image
+        $image_url = '';
+        if ( $auto_images ) {
+            $prompt = "Create a professional featured image for a blog article about \"{$question_text}\". Style: Modern, professional. Format: Landscape hero image. Avoid text and logos.";
+            $image_url = $ai->generate_image( $prompt );
+            if ( is_wp_error( $image_url ) ) {
+                $image_url = '';
+            }
+        }
+
+        $post_id = $generator->create_post( $title, $content, $post_status, $category_id, $image_url );
+
+        if ( is_wp_error( $post_id ) ) {
+            wp_send_json_error( [ 'message' => $post_id->get_error_message(), 'question' => $question_text ] );
+        }
+
+        // Store parent keyword for cannibalization tracking
+        update_post_meta( $post_id, '_jase_parent_keyword', sanitize_text_field( $parent_keyword ) );
+
+        // Update question status in DB
+        global $wpdb;
+        $wpdb->update(
+            $wpdb->prefix . 'jase_questions',
+            [ 'post_id' => $post_id, 'status' => 'used' ],
+            [ 'question' => $question_text ],
+            [ '%d', '%s' ],
+            [ '%s' ]
+        );
+
+        wp_send_json_success( [
+            'post' => [
+                'question' => $question_text,
+                'post_id'  => $post_id,
+                'title'    => $title,
+                'status'   => $post_status,
+                'edit_url' => get_edit_post_link( $post_id, 'raw' ),
+            ],
+        ] );
+    }
+
+    /**
+     * Check keyword cannibalization before generation.
+     */
+    public function check_cannibalization() {
+        $this->verify_nonce();
+
+        $questions = isset( $_POST['questions'] ) ? json_decode( wp_unslash( $_POST['questions'] ), true ) : [];
+        $warnings  = [];
+
+        foreach ( $questions as $q ) {
+            $keyword = is_array( $q ) ? ( $q['parent_keyword'] ?? ( $q['text'] ?? '' ) ) : $q;
+            if ( empty( $keyword ) ) continue;
+
+            $count = $this->count_keyword_articles( $keyword );
+            if ( $count > 0 ) {
+                $warnings[] = [
+                    'keyword'        => $keyword,
+                    'existing_count' => $count,
+                    'remaining'      => max( 0, 3 - $count ),
+                    'at_limit'       => $count >= 3,
+                ];
+            }
+        }
+
+        wp_send_json_success( [ 'warnings' => $warnings ] );
+    }
+
+    /**
+     * Count existing articles for a parent keyword.
+     */
+    private function count_keyword_articles( $keyword ) {
+        global $wpdb;
+
+        $keyword_lower = strtolower( trim( $keyword ) );
+
+        $count = $wpdb->get_var( $wpdb->prepare(
+            "SELECT COUNT(*) FROM {$wpdb->postmeta} pm
+             INNER JOIN {$wpdb->posts} p ON pm.post_id = p.ID
+             WHERE pm.meta_key = '_jase_parent_keyword'
+             AND LOWER(pm.meta_value) = %s
+             AND p.post_status IN ('publish', 'draft', 'pending')",
+            $keyword_lower
+        ) );
+
+        return absint( $count );
+    }
+
+    /**
+     * Get shuffled sitemap URLs for internal linking.
+     */
+    private function get_shuffled_sitemap_urls() {
+        $sitemap_url = JASE_Settings::get( 'sitemap_url', '' );
+        if ( empty( $sitemap_url ) ) {
+            return '';
+        }
+
+        $generator = new JASE_Content_Generator();
+        $urls      = $generator->fetch_sitemap_urls( $sitemap_url );
+
+        if ( is_wp_error( $urls ) || empty( $urls ) ) {
+            return '';
+        }
+
+        // Shuffle for variety across articles, take up to 20
+        shuffle( $urls );
+        $selected = array_slice( $urls, 0, min( 20, count( $urls ) ) );
+
+        return implode( "\n", $selected );
     }
 }

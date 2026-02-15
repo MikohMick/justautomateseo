@@ -388,7 +388,7 @@
                             '<span class="jase-card-score ' + scoreClass + '">Score: ' + q.score + '/10</span>' +
                         '</div>' +
                         '<div class="jase-card-meta">' +
-                            '<span>Volume: ' + (q.volume || 'N/A') + '</span>' +
+                            (q.volume ? '<span>Volume: ' + q.volume + '</span>' : '') +
                             '<span>Keyword: ' + JASE.escHtml(q.parent_keyword || '') + '</span>' +
                         '</div>' +
                         '<p class="jase-card-reasoning">' + JASE.escHtml(q.reasoning || '') + '</p>' +
@@ -464,9 +464,38 @@
 
         // ==================== Content Generation ====================
         populateGenerationSummary: function() {
+            var self = this;
             var $list = $('#jase-gen-questions-list').empty();
             this.selectedQuestions.forEach(function(q) {
                 $list.append('<li>' + JASE.escHtml(q.text) + '</li>');
+            });
+
+            // Check cannibalization
+            this.ajaxPost('jase_check_cannibalization', {
+                questions: JSON.stringify(this.selectedQuestions)
+            }, function(data) {
+                var warnings = data.warnings || [];
+                $('#jase-cannibal-warnings').remove();
+                if (!warnings.length) return;
+
+                var html = '<div id="jase-cannibal-warnings">';
+                warnings.forEach(function(w) {
+                    if (w.at_limit) {
+                        html += '<div class="jase-cannibal-warning">' +
+                            '<span class="dashicons dashicons-warning"></span>' +
+                            '<p><strong>Limit reached:</strong> "' + JASE.escHtml(w.keyword) + '" already has ' + w.existing_count + ' articles. ' +
+                            'Generating more would cause keyword cannibalization (your own pages competing against each other in search). Questions targeting this keyword will be skipped.</p>' +
+                        '</div>';
+                    } else {
+                        html += '<div class="jase-cannibal-warning">' +
+                            '<span class="dashicons dashicons-info"></span>' +
+                            '<p><strong>Note:</strong> "' + JASE.escHtml(w.keyword) + '" has ' + w.existing_count + '/3 articles. ' +
+                            'You can generate ' + w.remaining + ' more before reaching the recommended limit.</p>' +
+                        '</div>';
+                    }
+                });
+                html += '</div>';
+                $('#jase-generation-summary').after(html);
             });
         },
 
@@ -477,51 +506,100 @@
             }
 
             var self = this;
+            var questions = this.selectedQuestions.slice();
             var imageMode = $('input[name="jase_image_mode"]:checked').val();
             var categoryId = $('#jase-category').val();
             var postStatus = $('#jase-post-status').val();
+            var total = questions.length;
+            var current = 0;
+            var successCount = 0;
 
             $('#jase-generate-content').prop('disabled', true);
             $('#jase-gen-loading').show();
-            $('#jase-gen-results').hide();
+            $('#jase-gen-results').show();
+            $('#jase-gen-posts').empty();
 
-            this.ajaxPost('jase_generate_content', {
-                questions: JSON.stringify(this.selectedQuestions),
-                category_id: categoryId,
-                post_status: postStatus,
-                auto_images: imageMode === 'auto' ? 'true' : 'false',
-                image_prompts: '[]'
-            }, function(data) {
-                $('#jase-gen-loading').hide();
-                self.renderGeneratedPosts(data.posts || []);
-                $('#jase-gen-results').show();
-                self.completeStep(6);
-            }, function() {
-                $('#jase-gen-loading').hide();
-                $('#jase-generate-content').prop('disabled', false);
-            }, 300000); // 5 minute timeout for content generation
+            // Add progress bar
+            $('#jase-gen-status').html(
+                '<div class="jase-progress-wrap">' +
+                    '<div class="jase-progress-bar"><div class="jase-progress-fill" id="jase-progress-fill"></div></div>' +
+                    '<p class="jase-progress-text" id="jase-progress-text">Preparing to generate ' + total + ' articles...</p>' +
+                '</div>'
+            );
+
+            function generateNext() {
+                if (current >= total) {
+                    // All done
+                    $('#jase-gen-loading').hide();
+                    $('#jase-generate-content').prop('disabled', false);
+                    if (successCount > 0) {
+                        self.completeStep(6);
+                        update_option_complete();
+                    }
+                    return;
+                }
+
+                var q = questions[current];
+                var pct = Math.round(((current) / total) * 100);
+                $('#jase-progress-fill').css('width', pct + '%');
+                $('#jase-progress-text').text('Generating article ' + (current + 1) + ' of ' + total + ': ' + q.text);
+
+                self.ajaxPost('jase_generate_single_content', {
+                    question: JSON.stringify(q),
+                    category_id: categoryId,
+                    post_status: postStatus,
+                    auto_images: imageMode === 'auto' ? 'true' : 'false'
+                }, function(data) {
+                    self.appendGeneratedPost(data.post);
+                    successCount++;
+                    current++;
+                    var pct = Math.round((current / total) * 100);
+                    $('#jase-progress-fill').css('width', pct + '%');
+                    // 3s delay between articles to avoid rate limits
+                    setTimeout(generateNext, 3000);
+                }, function(response) {
+                    // Error - show it but continue with next
+                    var errMsg = (response && response.data && response.data.message) ? response.data.message : 'Generation failed';
+                    self.appendGeneratedPost({
+                        question: q.text,
+                        error: errMsg
+                    });
+                    current++;
+                    setTimeout(generateNext, 3000);
+                }, 180000); // 3 min timeout per article
+            }
+
+            function update_option_complete() {
+                self.ajaxPost('jase_generate_content', {
+                    questions: '[]',
+                    category_id: categoryId,
+                    post_status: postStatus,
+                    auto_images: 'false',
+                    image_prompts: '[]'
+                }, function() {}, function() {});
+            }
+
+            generateNext();
         },
 
-        renderGeneratedPosts: function(posts) {
-            var $container = $('#jase-gen-posts').empty();
-            posts.forEach(function(post) {
-                if (post.error) {
-                    $container.append(
-                        '<div class="jase-post-result is-error">' +
-                            '<div><span class="jase-post-result-title">' + JASE.escHtml(post.question) + '</span>' +
-                            '<br><span class="jase-post-result-status" style="color:#dc2626;">Error: ' + JASE.escHtml(post.error) + '</span></div>' +
-                        '</div>'
-                    );
-                } else {
-                    $container.append(
-                        '<div class="jase-post-result">' +
-                            '<div><span class="jase-post-result-title">' + JASE.escHtml(post.title) + '</span>' +
-                            '<br><span class="jase-post-result-status">Status: ' + post.status + '</span></div>' +
-                            (post.edit_url ? '<a href="' + post.edit_url + '" class="button jase-post-result-link" target="_blank">Edit Post</a>' : '') +
-                        '</div>'
-                    );
-                }
-            });
+        appendGeneratedPost: function(post) {
+            var $container = $('#jase-gen-posts');
+            if (post.error) {
+                $container.append(
+                    '<div class="jase-post-result is-error">' +
+                        '<div><span class="jase-post-result-title">' + JASE.escHtml(post.question) + '</span>' +
+                        '<br><span class="jase-post-result-status" style="color:#dc2626;">Error: ' + JASE.escHtml(post.error) + '</span></div>' +
+                    '</div>'
+                );
+            } else {
+                $container.append(
+                    '<div class="jase-post-result">' +
+                        '<div><span class="jase-post-result-title">' + JASE.escHtml(post.title) + '</span>' +
+                        '<br><span class="jase-post-result-status">Status: ' + post.status + '</span></div>' +
+                        (post.edit_url ? '<a href="' + post.edit_url + '" class="button jase-post-result-link" target="_blank">Edit Post</a>' : '') +
+                    '</div>'
+                );
+            }
         },
 
         // ==================== Settings ====================
