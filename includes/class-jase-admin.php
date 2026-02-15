@@ -99,14 +99,6 @@ class JASE_Admin {
                 <p class="description">Configure your API keys. These will be moved to a remote server in a future update.</p>
                 <table class="form-table">
                     <tr>
-                        <th><label for="rapidapi_key">RapidAPI Key</label></th>
-                        <td>
-                            <input type="password" id="rapidapi_key" name="rapidapi_key" class="regular-text"
-                                value="<?php echo esc_attr( $settings['rapidapi_key'] ?? '' ); ?>" />
-                            <p class="description">Optional — no longer required. Keyword research now uses Google Autocomplete.</p>
-                        </td>
-                    </tr>
-                    <tr>
                         <th><label for="openai_api_key">OpenAI API Key</label></th>
                         <td>
                             <input type="password" id="openai_api_key" name="openai_api_key" class="regular-text"

@@ -18,10 +18,6 @@ class JASE_Settings {
         return get_option( 'jase_settings', [] );
     }
 
-    public static function get_rapidapi_key() {
-        return self::get( 'rapidapi_key', '' );
-    }
-
     public static function get_openai_key() {
         return self::get( 'openai_api_key', '' );
     }

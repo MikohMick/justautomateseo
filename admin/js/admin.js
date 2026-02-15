@@ -527,7 +527,6 @@
         // ==================== Settings ====================
         saveSettings: function() {
             var data = {
-                rapidapi_key: $('#rapidapi_key').val(),
                 openai_api_key: $('#openai_api_key').val(),
                 gsc_client_id: $('#gsc_client_id').val(),
                 gsc_client_secret: $('#gsc_client_secret').val()

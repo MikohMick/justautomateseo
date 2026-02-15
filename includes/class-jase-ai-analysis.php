@@ -39,23 +39,28 @@ class JASE_AI_Analysis {
     public function analyze_keywords( $keywords ) {
         $keyword_list = '';
         foreach ( $keywords as $kw ) {
-            $keyword_list .= sprintf(
-                "- \"%s\" (volume: %d, competition: %s, trend: %.1f)\n",
-                $kw['text'],
-                $kw['volume'],
-                $kw['competition_level'],
-                $kw['trend']
-            );
+            $text        = $kw['text'] ?? '';
+            $volume      = $kw['volume'] ?? 0;
+            $competition = $kw['competition_level'] ?? '';
+
+            if ( $volume > 0 || ! empty( $competition ) ) {
+                $keyword_list .= sprintf(
+                    "- \"%s\" (volume: %d, competition: %s)\n",
+                    $text, $volume, $competition
+                );
+            } else {
+                $keyword_list .= sprintf( "- \"%s\"\n", $text );
+            }
         }
 
         $messages = [
             [
                 'role'    => 'system',
-                'content' => 'You are an SEO strategist. Analyze keywords and return ONLY valid JSON - no other text. Score keywords 1-10 based on: search volume opportunity, low competition potential, positive trend, and content creation potential. Return the top 5 keywords.',
+                'content' => 'You are an SEO strategist. Analyze keywords from Google Autocomplete and return ONLY valid JSON - no other text. Score keywords 1-10 based on: search intent clarity, content creation potential, specificity (long-tail is better), and commercial or informational value. Return the top 5 keywords.',
             ],
             [
                 'role'    => 'user',
-                'content' => "Analyze these keywords and return the best 5 as JSON array:\n\n{$keyword_list}\n\nReturn ONLY a JSON array like: [{\"text\":\"keyword\",\"score\":8,\"reasoning\":\"brief reason\",\"volume\":1000,\"competition_level\":\"LOW\"}]",
+                'content' => "These are real Google Autocomplete suggestions. Analyze them and return the best 5 as JSON array:\n\n{$keyword_list}\n\nReturn ONLY a JSON array like: [{\"text\":\"keyword\",\"score\":8,\"reasoning\":\"brief reason\",\"volume\":0,\"competition_level\":\"\"}]",
             ],
         ];
 
@@ -79,22 +84,24 @@ class JASE_AI_Analysis {
     public function analyze_questions( $questions, $keyword ) {
         $question_list = '';
         foreach ( $questions as $q ) {
-            $question_list .= sprintf(
-                "- \"%s\" (volume: %d, competition: %s)\n",
-                $q['text'],
-                $q['volume'],
-                $q['competition_level']
-            );
+            $text   = $q['text'] ?? '';
+            $volume = $q['volume'] ?? 0;
+
+            if ( $volume > 0 ) {
+                $question_list .= sprintf( "- \"%s\" (volume: %d)\n", $text, $volume );
+            } else {
+                $question_list .= sprintf( "- \"%s\"\n", $text );
+            }
         }
 
         $messages = [
             [
                 'role'    => 'system',
-                'content' => 'You are an SEO content strategist. Analyze questions for a keyword and return ONLY valid JSON. Score questions 1-10 based on: search volume, content potential, user intent clarity, and ability to create comprehensive answers.',
+                'content' => 'You are an SEO content strategist. Analyze questions from Google Autocomplete for a keyword and return ONLY valid JSON. Score questions 1-10 based on: content potential, user intent clarity, ability to create comprehensive answers, and specificity.',
             ],
             [
                 'role'    => 'user',
-                'content' => "For the keyword \"{$keyword}\", analyze these questions and return the best 5 as JSON:\n\n{$question_list}\n\nReturn ONLY a JSON array like: [{\"text\":\"question\",\"score\":8,\"reasoning\":\"brief reason\",\"volume\":500}]",
+                'content' => "For the keyword \"{$keyword}\", these are real Google Autocomplete questions. Analyze and return the best 5 as JSON:\n\n{$question_list}\n\nReturn ONLY a JSON array like: [{\"text\":\"question\",\"score\":8,\"reasoning\":\"brief reason\",\"volume\":0}]",
             ],
         ];
 

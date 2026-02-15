@@ -45,7 +45,7 @@ class JASE_Ajax_Handler {
     public function save_settings() {
         $this->verify_nonce();
 
-        $fields = [ 'rapidapi_key', 'openai_api_key', 'gsc_client_id', 'gsc_client_secret' ];
+        $fields = [ 'openai_api_key', 'gsc_client_id', 'gsc_client_secret' ];
         foreach ( $fields as $field ) {
             if ( isset( $_POST[ $field ] ) ) {
                 JASE_Settings::set( $field, sanitize_text_field( wp_unslash( $_POST[ $field ] ) ) );
