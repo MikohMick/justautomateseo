@@ -379,7 +379,9 @@ class JASE_Ajax_Handler {
         $image_prompts = isset( $_POST['image_prompts'] ) ? json_decode( wp_unslash( $_POST['image_prompts'] ), true ) : [];
 
         if ( empty( $questions ) ) {
-            wp_send_json_error( [ 'message' => 'No questions provided' ] );
+            // Called from queue mode after all articles generated individually
+            update_option( 'jase_setup_complete', true );
+            wp_send_json_success( [ 'posts' => [] ] );
         }
 
         $ai        = new JASE_AI_Analysis();

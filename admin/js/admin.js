@@ -109,6 +109,7 @@
             var accordion = $('.jase-accordion[data-step="' + step + '"]');
             if (accordion.hasClass('is-active')) {
                 accordion.removeClass('is-active');
+                accordion.find('.jase-accordion-body').slideUp(300);
             } else {
                 this.openStep(step);
             }
@@ -118,10 +119,15 @@
             var accordion = $('.jase-accordion[data-step="' + step + '"]');
             if (accordion.hasClass('is-disabled')) return;
 
-            // Close all
-            $('.jase-accordion').removeClass('is-active');
-            // Open target
+            // Close all open bodies smoothly
+            $('.jase-accordion.is-active').each(function() {
+                $(this).removeClass('is-active');
+                $(this).find('.jase-accordion-body').slideUp(300);
+            });
+
+            // Open target with animation
             accordion.addClass('is-active');
+            accordion.find('.jase-accordion-body').slideDown(400);
             this.currentStep = step;
 
             // Populate step 6 summary when opened
@@ -129,17 +135,19 @@
                 this.populateGenerationSummary();
             }
 
-            // Scroll into view
+            // Scroll into view after animation
             setTimeout(function() {
                 $('html, body').animate({
                     scrollTop: accordion.offset().top - 50
                 }, 300);
-            }, 100);
+            }, 200);
         },
 
         completeStep: function(step) {
             var accordion = $('.jase-accordion[data-step="' + step + '"]');
-            accordion.addClass('is-complete').removeClass('is-active');
+            accordion.find('.jase-accordion-body').slideUp(300, function() {
+                accordion.addClass('is-complete').removeClass('is-active');
+            });
 
             if (this.completedSteps.indexOf(step) === -1) {
                 this.completedSteps.push(step);
@@ -349,8 +357,9 @@
             this.ajaxPost('jase_select_keywords', {
                 selected: JSON.stringify(this.selectedKeywords)
             }, function() {
-                $('#jase-kw-results').hide();
-                $('#jase-kw-confirmed').show();
+                $('#jase-kw-results').slideUp(300, function() {
+                    $('#jase-kw-confirmed').addClass('jase-confirmed-animate').slideDown(300);
+                });
             });
         },
 
@@ -427,8 +436,9 @@
             this.ajaxPost('jase_select_questions', {
                 selected: JSON.stringify(this.selectedQuestions)
             }, function() {
-                $('#jase-q-results').hide();
-                $('#jase-q-confirmed').show();
+                $('#jase-q-results').slideUp(300, function() {
+                    $('#jase-q-confirmed').addClass('jase-confirmed-animate').slideDown(300);
+                });
             });
         },
 
@@ -453,7 +463,7 @@
                     '</div>' +
                     '<p style="margin-top:8px;font-size:13px;color:#64748b;">Sample: ' + data.sample.join(', ') + '</p>'
                 );
-                $('#jase-sitemap-confirmed').show();
+                $('#jase-sitemap-confirmed').addClass('jase-confirmed-animate').slideDown(300);
             }, function() {
                 $('#jase-sitemap-loading').hide();
                 $('#jase-sitemap-result').show().html(
