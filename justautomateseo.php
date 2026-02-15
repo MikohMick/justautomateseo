@@ -3,7 +3,7 @@
  * Plugin Name: JustAutomateSEO
  * Plugin URI: https://justautomateseo.com
  * Description: AI-powered SEO automation plugin - connects to Google Search Console, performs keyword research, generates optimized content, and publishes to WordPress.
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: JustAutomateSEO
  * License: GPL v2 or later
  * Text Domain: justautomateseo
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'JASE_VERSION', '1.0.0' );
+define( 'JASE_VERSION', '1.0.1' );
 define( 'JASE_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'JASE_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'JASE_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );
