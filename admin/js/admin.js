@@ -309,8 +309,9 @@
                             '<span class="jase-card-score ' + scoreClass + '">Score: ' + kw.score + '/10</span>' +
                         '</div>' +
                         '<div class="jase-card-meta">' +
-                            '<span>Volume: ' + (kw.volume || 'N/A') + '</span>' +
-                            '<span>Competition: ' + (kw.competition_level || 'N/A') + '</span>' +
+                            (kw.volume ? '<span>Volume: ' + kw.volume + '</span>' : '') +
+                            (kw.competition_level ? '<span>Competition: ' + kw.competition_level + '</span>' : '') +
+                            '<span>Source: Google Suggest</span>' +
                         '</div>' +
                         '<p class="jase-card-reasoning">' + JASE.escHtml(kw.reasoning || '') + '</p>' +
                     '</div>'

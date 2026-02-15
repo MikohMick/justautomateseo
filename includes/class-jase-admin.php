@@ -103,7 +103,7 @@ class JASE_Admin {
                         <td>
                             <input type="password" id="rapidapi_key" name="rapidapi_key" class="regular-text"
                                 value="<?php echo esc_attr( $settings['rapidapi_key'] ?? '' ); ?>" />
-                            <p class="description">For Google Keyword Insight API</p>
+                            <p class="description">Optional — no longer required. Keyword research now uses Google Autocomplete.</p>
                         </td>
                     </tr>
                     <tr>
@@ -255,7 +255,7 @@ class JASE_Admin {
                     <div class="jase-accordion-body" data-step="2">
                         <div class="jase-step-content">
                             <div id="jase-keyword-research">
-                                <p>We'll research keywords based on your GSC queries and use AI to identify the top 5 opportunities.</p>
+                                <p>We'll use Google Autocomplete to discover keyword ideas based on your GSC queries, then AI will identify the top opportunities.</p>
                                 <div class="jase-filter-row">
                                     <label>Country:
                                         <select id="jase-kw-location" class="jase-select">
