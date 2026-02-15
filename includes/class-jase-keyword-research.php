@@ -30,13 +30,24 @@ class JASE_Keyword_Research {
         }
 
         $code = wp_remote_retrieve_response_code( $response );
+        $raw_body = wp_remote_retrieve_body( $response );
+
         if ( $code !== 200 ) {
-            return new WP_Error( 'api_error', 'Keyword API returned status ' . $code );
+            // Include response body in error for debugging
+            $error_msg = 'Keyword API returned status ' . $code;
+            if ( ! empty( $raw_body ) ) {
+                $error_msg .= ' - Response: ' . substr( $raw_body, 0, 200 );
+            }
+            return new WP_Error( 'api_error', $error_msg );
         }
 
-        $body = json_decode( wp_remote_retrieve_body( $response ), true );
+        $body = json_decode( $raw_body, true );
+
+        // Log for debugging
+        error_log( 'RapidAPI Keyword Response for "' . $keyword . '" (location: ' . $location . '): ' . print_r( $body, true ) );
+
         if ( ! is_array( $body ) ) {
-            return new WP_Error( 'parse_error', 'Invalid response from keyword API' );
+            return new WP_Error( 'parse_error', 'Invalid response from keyword API. Response: ' . substr( $raw_body, 0, 200 ) );
         }
 
         return $body;

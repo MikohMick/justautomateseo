@@ -144,20 +144,36 @@ class JASE_Ajax_Handler {
         $research     = new JASE_Keyword_Research();
         $all_keywords = [];
         $errors       = [];
+        $success_count = 0;
+
+        error_log( 'Starting batch keyword research for ' . count( $queries ) . ' queries in location: ' . $location );
 
         foreach ( array_slice( $queries, 0, 10 ) as $query ) {
             $query = sanitize_text_field( $query );
             if ( empty( $query ) ) continue;
 
+            error_log( 'Fetching keywords for: ' . $query );
             $results = $research->get_keyword_suggestions( $query, $location );
+
             if ( is_wp_error( $results ) ) {
-                $errors[] = $query . ': ' . $results->get_error_message();
+                $errors[] = '"' . $query . '": ' . $results->get_error_message();
+                error_log( 'API Error for "' . $query . '": ' . $results->get_error_message() );
                 continue;
             }
-            if ( is_array( $results ) ) {
+
+            if ( is_array( $results ) && ! empty( $results ) ) {
+                $count_before = count( $all_keywords );
                 $all_keywords = array_merge( $all_keywords, $results );
+                $added = count( $all_keywords ) - $count_before;
+                error_log( 'Added ' . $added . ' keywords for "' . $query . '"' );
+                $success_count++;
+            } else {
+                $errors[] = '"' . $query . '": API returned empty array';
+                error_log( 'Empty result for "' . $query . '"' );
             }
         }
+
+        error_log( 'Total keywords before dedup: ' . count( $all_keywords ) );
 
         // Deduplicate by keyword text
         $seen  = [];
@@ -171,11 +187,16 @@ class JASE_Ajax_Handler {
             }
         }
 
+        error_log( 'Keywords after dedup: ' . count( $deduped ) );
+
         if ( empty( $deduped ) ) {
             $msg = 'No keywords found for the selected queries.';
+            $msg .= ' Tried ' . count( $queries ) . ' queries in location "' . $location . '", succeeded: ' . $success_count . '.';
             if ( ! empty( $errors ) ) {
-                $msg .= ' API errors: ' . implode( '; ', $errors );
+                $msg .= ' Errors: ' . implode( ' | ', $errors );
             }
+            $msg .= ' Check WordPress debug.log for details.';
+            error_log( 'FINAL ERROR: ' . $msg );
             wp_send_json_error( [ 'message' => $msg ] );
         }
 
