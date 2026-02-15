@@ -15,6 +15,7 @@ class JASE_Ajax_Handler {
 
         // Keyword Research
         add_action( 'wp_ajax_jase_research_keywords', [ $this, 'research_keywords' ] );
+        add_action( 'wp_ajax_jase_research_keywords_batch', [ $this, 'research_keywords_batch' ] );
         add_action( 'wp_ajax_jase_analyze_keywords', [ $this, 'analyze_keywords' ] );
         add_action( 'wp_ajax_jase_select_keywords', [ $this, 'select_keywords' ] );
 
@@ -129,6 +130,59 @@ class JASE_Ajax_Handler {
         }
 
         wp_send_json_success( [ 'keywords' => $results ] );
+    }
+
+    public function research_keywords_batch() {
+        $this->verify_nonce();
+        $queries  = isset( $_POST['queries'] ) ? json_decode( wp_unslash( $_POST['queries'] ), true ) : [];
+        $location = isset( $_POST['location'] ) ? sanitize_text_field( wp_unslash( $_POST['location'] ) ) : 'US';
+
+        if ( empty( $queries ) || ! is_array( $queries ) ) {
+            wp_send_json_error( [ 'message' => 'No queries provided. Please select at least one GSC query.' ] );
+        }
+
+        $research     = new JASE_Keyword_Research();
+        $all_keywords = [];
+        $errors       = [];
+
+        foreach ( array_slice( $queries, 0, 10 ) as $query ) {
+            $query = sanitize_text_field( $query );
+            if ( empty( $query ) ) continue;
+
+            $results = $research->get_keyword_suggestions( $query, $location );
+            if ( is_wp_error( $results ) ) {
+                $errors[] = $query . ': ' . $results->get_error_message();
+                continue;
+            }
+            if ( is_array( $results ) ) {
+                $all_keywords = array_merge( $all_keywords, $results );
+            }
+        }
+
+        // Deduplicate by keyword text
+        $seen  = [];
+        $deduped = [];
+        foreach ( $all_keywords as $kw ) {
+            $text = is_array( $kw ) ? ( $kw['text'] ?? ( $kw['keyword'] ?? '' ) ) : $kw;
+            $key  = strtolower( trim( $text ) );
+            if ( ! isset( $seen[ $key ] ) ) {
+                $seen[ $key ] = true;
+                $deduped[]    = $kw;
+            }
+        }
+
+        if ( empty( $deduped ) ) {
+            $msg = 'No keywords found for the selected queries.';
+            if ( ! empty( $errors ) ) {
+                $msg .= ' API errors: ' . implode( '; ', $errors );
+            }
+            wp_send_json_error( [ 'message' => $msg ] );
+        }
+
+        wp_send_json_success( [
+            'keywords' => $deduped,
+            'errors'   => $errors,
+        ] );
     }
 
     public function analyze_keywords() {

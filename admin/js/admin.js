@@ -7,6 +7,7 @@
         selectedKeywords: [],
         selectedQuestions: [],
         gscQueries: [],
+        selectedGscQueries: [],
         allKeywords: [],
 
         init: function() {
@@ -53,6 +54,19 @@
             $('#jase-connect-gsc').on('click', function() { self.connectGSC(); });
             $('#jase-select-site').on('click', function() { self.selectGSCSite(); });
             $('#jase-fetch-queries').on('click', function() { self.fetchQueries(); });
+
+            // GSC query selection
+            $(document).on('change', '.jase-query-checkbox', function() {
+                self.toggleGscQuery($(this));
+            });
+            $('#jase-query-select-all').on('change', function() {
+                var checked = $(this).is(':checked');
+                $('.jase-query-checkbox').each(function() {
+                    if ($(this).is(':checked') !== checked) {
+                        $(this).prop('checked', checked).trigger('change');
+                    }
+                });
+            });
 
             // Step 2: Keywords
             $('#jase-start-keyword-research').on('click', function() { self.startKeywordResearch(); });
@@ -182,11 +196,13 @@
             this.ajaxPost('jase_gsc_fetch_queries', { days: days, limit: limit }, function(data) {
                 $('#jase-queries-loading').hide();
                 self.gscQueries = data.queries || [];
+                self.selectedGscQueries = [];
 
                 var $tbody = $('#jase-queries-table tbody').empty();
-                self.gscQueries.forEach(function(q) {
+                self.gscQueries.forEach(function(q, i) {
                     $tbody.append(
-                        '<tr>' +
+                        '<tr data-query-index="' + i + '">' +
+                        '<td><input type="checkbox" class="jase-query-checkbox" data-index="' + i + '" /></td>' +
                         '<td><strong>' + self.escHtml(q.query) + '</strong></td>' +
                         '<td>' + q.clicks + '</td>' +
                         '<td>' + q.impressions + '</td>' +
@@ -196,10 +212,39 @@
                     );
                 });
 
+                $('#jase-query-select-all').prop('checked', false);
+                $('#jase-query-select-count').show();
+                self.updateGscSelectCount();
                 $('#jase-queries-table-wrap').show();
             }, function() {
                 $('#jase-queries-loading').hide();
             });
+        },
+
+        toggleGscQuery: function($checkbox) {
+            var index = parseInt($checkbox.data('index'));
+            var query = this.gscQueries[index];
+            var $row = $checkbox.closest('tr');
+
+            if ($checkbox.is(':checked')) {
+                if (this.selectedGscQueries.length >= 10) {
+                    $checkbox.prop('checked', false);
+                    alert('You can select a maximum of 10 queries');
+                    return;
+                }
+                $row.addClass('is-selected');
+                this.selectedGscQueries.push(query);
+            } else {
+                $row.removeClass('is-selected');
+                this.selectedGscQueries = this.selectedGscQueries.filter(function(q) {
+                    return q.query !== query.query;
+                });
+            }
+            this.updateGscSelectCount();
+        },
+
+        updateGscSelectCount: function() {
+            $('#jase-gsc-selected-count').text(this.selectedGscQueries.length);
         },
 
         // ==================== Keywords ====================
@@ -209,20 +254,31 @@
                 return;
             }
 
+            // Use selected queries, or fall back to top 3 if none selected
+            var queries = [];
+            if (this.selectedGscQueries.length) {
+                queries = this.selectedGscQueries.map(function(q) { return q.query; });
+            } else {
+                queries = this.gscQueries.slice(0, 3).map(function(q) { return q.query; });
+            }
+
             var self = this;
             var location = $('#jase-kw-location').val();
 
             $('#jase-kw-loading').show();
             $('#jase-kw-results').hide();
 
-            // Use top query as seed for keyword research
-            var topQuery = this.gscQueries[0].query;
-
-            this.ajaxPost('jase_research_keywords', {
-                query: topQuery,
+            this.ajaxPost('jase_research_keywords_batch', {
+                queries: JSON.stringify(queries),
                 location: location
             }, function(data) {
                 self.allKeywords = data.keywords || [];
+
+                if (!self.allKeywords.length) {
+                    $('#jase-kw-loading').hide();
+                    alert('No keywords found. Try selecting different queries or changing the country.');
+                    return;
+                }
 
                 // Now analyze with AI
                 self.ajaxPost('jase_analyze_keywords', {
@@ -236,7 +292,7 @@
                 });
             }, function() {
                 $('#jase-kw-loading').hide();
-            });
+            }, 120000); // 2 min timeout for batch
         },
 
         renderKeywordCards: function(keywords) {

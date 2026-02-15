@@ -270,6 +270,38 @@
     background: #f8fafc;
 }
 
+/* Selectable Query Rows */
+.jase-th-check {
+    width: 36px;
+    text-align: center !important;
+}
+
+.jase-query-checkbox {
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+}
+
+#jase-queries-table tr.is-selected td {
+    background: #eff6ff;
+}
+
+#jase-queries-table tr.is-selected td:first-child {
+    border-left: 3px solid #2563eb;
+}
+
+.jase-query-select-hint {
+    font-size: 13px;
+    color: #475569;
+    margin: 12px 0 4px;
+}
+
+#jase-query-select-count {
+    font-size: 13px;
+    color: #475569;
+    margin: 4px 0 0;
+}
+
 /* Select & Inputs */
 .jase-select {
     padding: 6px 12px;

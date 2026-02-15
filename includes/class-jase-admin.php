@@ -212,9 +212,11 @@ class JASE_Admin {
                                         <p>Fetching queries from Google Search Console...</p>
                                     </div>
                                     <div id="jase-queries-table-wrap" style="display:none;">
+                                        <p class="jase-query-select-hint">Select the queries you want to use as seeds for keyword research (up to 10):</p>
                                         <table class="jase-table" id="jase-queries-table">
                                             <thead>
                                                 <tr>
+                                                    <th class="jase-th-check"><input type="checkbox" id="jase-query-select-all" title="Select all" /></th>
                                                     <th>Query</th>
                                                     <th>Clicks</th>
                                                     <th>Impressions</th>
@@ -224,6 +226,9 @@ class JASE_Admin {
                                             </thead>
                                             <tbody></tbody>
                                         </table>
+                                        <p id="jase-query-select-count" style="display:none;">
+                                            <strong><span id="jase-gsc-selected-count">0</span></strong> queries selected
+                                        </p>
                                         <button type="button" class="button button-primary jase-btn jase-next-step" data-next="2">
                                             Continue to Keyword Research <span class="dashicons dashicons-arrow-right-alt"></span>
                                         </button>
