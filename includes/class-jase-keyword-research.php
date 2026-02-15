@@ -118,15 +118,22 @@ class JASE_Keyword_Research {
      * @return array|WP_Error  Array of suggestion strings or WP_Error.
      */
     private function fetch_autocomplete( $query, $location = 'US', $lang = 'en' ) {
-        $url = 'https://suggestqueries.google.com/complete/search?' . http_build_query( [
-            'client' => 'firefox',
-            'q'      => $query,
-            'hl'     => $lang,
-            'gl'     => $location,
+        // Use the XML endpoint - more reliable for server-side requests
+        $url = 'https://www.google.com/complete/search?' . http_build_query( [
+            'client'  => 'gws-wiz',
+            'xssi'    => 't',
+            'q'       => $query,
+            'hl'      => $lang,
+            'gl'      => $location,
         ] );
 
         $response = wp_remote_get( $url, [
             'timeout' => 10,
+            'headers' => [
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept'     => '*/*',
+                'Referer'    => 'https://www.google.com/',
+            ],
         ] );
 
         if ( is_wp_error( $response ) ) {
@@ -135,16 +142,78 @@ class JASE_Keyword_Research {
         }
 
         $code = wp_remote_retrieve_response_code( $response );
+        $raw  = wp_remote_retrieve_body( $response );
+
         if ( $code !== 200 ) {
-            $error_msg = 'Google Autocomplete returned status ' . $code;
-            error_log( $error_msg );
-            return new WP_Error( 'api_error', $error_msg );
+            error_log( 'Google Autocomplete returned status ' . $code . ' for "' . $query . '" - body: ' . substr( $raw, 0, 300 ) );
+            return new WP_Error( 'api_error', 'Google Autocomplete returned status ' . $code );
+        }
+
+        // The gws-wiz endpoint prefixes response with ")]}'\n" - strip it
+        $raw = preg_replace( '/^\)\]\}\'\s*\n?/', '', $raw );
+
+        $body = json_decode( $raw, true );
+
+        if ( ! is_array( $body ) ) {
+            // Fallback: try the firefox client endpoint
+            return $this->fetch_autocomplete_fallback( $query, $location, $lang );
+        }
+
+        // Extract suggestion strings from the nested array structure
+        $suggestions = [];
+        if ( isset( $body[0] ) && is_array( $body[0] ) ) {
+            foreach ( $body[0] as $item ) {
+                if ( is_array( $item ) && isset( $item[0] ) && is_string( $item[0] ) ) {
+                    // Strip any HTML tags from suggestions
+                    $text = strip_tags( $item[0] );
+                    if ( ! empty( $text ) ) {
+                        $suggestions[] = $text;
+                    }
+                }
+            }
+        }
+
+        if ( empty( $suggestions ) ) {
+            error_log( 'Google Autocomplete: could not parse suggestions for "' . $query . '", trying fallback' );
+            return $this->fetch_autocomplete_fallback( $query, $location, $lang );
+        }
+
+        return $suggestions;
+    }
+
+    /**
+     * Fallback autocomplete using the toolbar/firefox endpoint.
+     */
+    private function fetch_autocomplete_fallback( $query, $location = 'US', $lang = 'en' ) {
+        $url = 'https://clients1.google.com/complete/search?' . http_build_query( [
+            'client' => 'firefox',
+            'q'      => $query,
+            'hl'     => $lang,
+            'gl'     => $location,
+        ] );
+
+        $response = wp_remote_get( $url, [
+            'timeout' => 10,
+            'headers' => [
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept'     => 'application/json',
+            ],
+        ] );
+
+        if ( is_wp_error( $response ) ) {
+            return $response;
+        }
+
+        $code = wp_remote_retrieve_response_code( $response );
+        if ( $code !== 200 ) {
+            error_log( 'Google Autocomplete fallback returned status ' . $code . ' for "' . $query . '"' );
+            return new WP_Error( 'api_error', 'Google Autocomplete fallback returned status ' . $code );
         }
 
         $body = json_decode( wp_remote_retrieve_body( $response ), true );
 
         if ( ! is_array( $body ) || ! isset( $body[1] ) || ! is_array( $body[1] ) ) {
-            return new WP_Error( 'parse_error', 'Invalid response from Google Autocomplete' );
+            return new WP_Error( 'parse_error', 'Invalid response from Google Autocomplete fallback' );
         }
 
         return $body[1];
