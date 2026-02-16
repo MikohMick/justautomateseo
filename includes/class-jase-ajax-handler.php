@@ -33,6 +33,9 @@ class JASE_Ajax_Handler {
         add_action( 'wp_ajax_jase_generate_content', [ $this, 'generate_content' ] );
         add_action( 'wp_ajax_jase_generate_single_content', [ $this, 'generate_single_content' ] );
         add_action( 'wp_ajax_jase_check_cannibalization', [ $this, 'check_cannibalization' ] );
+
+        // GSC Disconnect
+        add_action( 'wp_ajax_jase_gsc_disconnect', [ $this, 'gsc_disconnect' ] );
     }
 
     private function verify_nonce() {
@@ -47,10 +50,22 @@ class JASE_Ajax_Handler {
     public function save_settings() {
         $this->verify_nonce();
 
-        $fields = [ 'openai_api_key', 'gsc_client_id', 'gsc_client_secret' ];
+        $fields = [
+            'openai_api_key',
+            'gsc_client_id',
+            'gsc_client_secret',
+            'sitemap_url',
+            'default_post_status',
+            'default_image_mode',
+            'default_category',
+        ];
         foreach ( $fields as $field ) {
             if ( isset( $_POST[ $field ] ) ) {
-                JASE_Settings::set( $field, sanitize_text_field( wp_unslash( $_POST[ $field ] ) ) );
+                $value = sanitize_text_field( wp_unslash( $_POST[ $field ] ) );
+                if ( $field === 'sitemap_url' ) {
+                    $value = esc_url_raw( wp_unslash( $_POST[ $field ] ) );
+                }
+                JASE_Settings::set( $field, $value );
             }
         }
 
@@ -628,5 +643,18 @@ class JASE_Ajax_Handler {
         $selected = array_slice( $urls, 0, min( 20, count( $urls ) ) );
 
         return implode( "\n", $selected );
+    }
+
+    /**
+     * Disconnect from Google Search Console.
+     */
+    public function gsc_disconnect() {
+        $this->verify_nonce();
+
+        // Clear GSC tokens and site URL
+        JASE_Settings::set_gsc_tokens( [] );
+        JASE_Settings::set( 'gsc_site_url', '' );
+
+        wp_send_json_success( [ 'message' => 'Disconnected from Google Search Console' ] );
     }
 }

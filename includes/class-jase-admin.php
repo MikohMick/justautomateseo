@@ -10,6 +10,9 @@ class JASE_Admin {
     }
 
     public function add_menu() {
+        $setup_complete = get_option( 'jase_setup_complete', false );
+        $wizard_label   = $setup_complete ? 'Generate Posts' : 'Setup Wizard';
+
         add_menu_page(
             'JustAutomateSEO',
             'JustAutomateSEO',
@@ -22,8 +25,8 @@ class JASE_Admin {
 
         add_submenu_page(
             'justautomateseo',
-            'Setup Wizard',
-            'Setup Wizard',
+            $wizard_label,
+            $wizard_label,
             'manage_options',
             'justautomateseo',
             [ $this, 'render_wizard_page' ]
@@ -60,11 +63,15 @@ class JASE_Admin {
         );
 
         wp_localize_script( 'jase-admin', 'jaseAdmin', [
-            'ajaxUrl'      => admin_url( 'admin-ajax.php' ),
-            'nonce'        => wp_create_nonce( 'jase_nonce' ),
-            'isConnected'  => ! empty( JASE_Settings::get_gsc_tokens() ),
-            'siteUrl'      => JASE_Settings::get_gsc_site_url(),
-            'setupComplete' => get_option( 'jase_setup_complete', false ),
+            'ajaxUrl'            => admin_url( 'admin-ajax.php' ),
+            'nonce'              => wp_create_nonce( 'jase_nonce' ),
+            'isConnected'        => ! empty( JASE_Settings::get_gsc_tokens() ),
+            'siteUrl'            => JASE_Settings::get_gsc_site_url(),
+            'setupComplete'      => get_option( 'jase_setup_complete', false ),
+            'defaultPostStatus'  => JASE_Settings::get( 'default_post_status', 'draft' ),
+            'defaultImageMode'   => JASE_Settings::get( 'default_image_mode', 'auto' ),
+            'defaultCategory'    => JASE_Settings::get( 'default_category', '0' ),
+            'sitemapUrl'         => JASE_Settings::get( 'sitemap_url', '' ),
         ] );
     }
 
@@ -90,20 +97,30 @@ class JASE_Admin {
     }
 
     public function render_settings_page() {
-        $settings = JASE_Settings::get_all();
+        $settings       = JASE_Settings::get_all();
+        $is_connected   = ! empty( JASE_Settings::get_gsc_tokens() );
+        $gsc_site_url   = JASE_Settings::get_gsc_site_url();
+        $categories     = get_categories( [ 'hide_empty' => false ] );
+        $default_cat    = $settings['default_category'] ?? '0';
+        $default_status = $settings['default_post_status'] ?? 'draft';
+        $default_image  = $settings['default_image_mode'] ?? 'auto';
         ?>
         <div class="wrap jase-settings-wrap">
             <h1>JustAutomateSEO Settings</h1>
+
+            <!-- Section 1: API Keys -->
             <div class="jase-settings-card">
                 <h2>API Keys</h2>
-                <p class="description">Configure your API keys. These will be moved to a remote server in a future update.</p>
+                <p class="description">Configure your API keys for AI content generation and Google integration.</p>
                 <table class="form-table">
                     <tr>
                         <th><label for="openai_api_key">OpenAI API Key</label></th>
                         <td>
                             <input type="password" id="openai_api_key" name="openai_api_key" class="regular-text"
                                 value="<?php echo esc_attr( $settings['openai_api_key'] ?? '' ); ?>" />
-                            <p class="description">For AI analysis and content generation</p>
+                            <p class="description">Required for AI analysis and content generation.
+                                <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">Get your OpenAI API key &rarr;</a>
+                            </p>
                         </td>
                     </tr>
                     <tr>
@@ -111,6 +128,9 @@ class JASE_Admin {
                         <td>
                             <input type="text" id="gsc_client_id" name="gsc_client_id" class="regular-text"
                                 value="<?php echo esc_attr( $settings['gsc_client_id'] ?? '' ); ?>" />
+                            <p class="description">Required for Google Search Console connection.
+                                <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Create OAuth credentials &rarr;</a>
+                            </p>
                         </td>
                     </tr>
                     <tr>
@@ -118,23 +138,149 @@ class JASE_Admin {
                         <td>
                             <input type="password" id="gsc_client_secret" name="gsc_client_secret" class="regular-text"
                                 value="<?php echo esc_attr( $settings['gsc_client_secret'] ?? '' ); ?>" />
+                            <p class="description">Found in the same Google Cloud Console credentials page as above.</p>
                         </td>
                     </tr>
                 </table>
-                <p><button type="button" class="button button-primary" id="jase-save-settings">Save Settings</button>
-                <span class="jase-save-spinner spinner"></span></p>
             </div>
+
+            <!-- Section 2: Google Search Console -->
+            <div class="jase-settings-card">
+                <h2>Google Search Console</h2>
+                <p class="description">Connect your Google Search Console to fetch ranking data for keyword research.</p>
+                <div id="jase-settings-gsc-status">
+                    <?php if ( $is_connected && $gsc_site_url ) : ?>
+                        <div class="jase-gsc-status-badge is-connected">
+                            <span class="dashicons dashicons-yes-alt"></span>
+                            Connected to <strong><?php echo esc_html( $gsc_site_url ); ?></strong>
+                        </div>
+                        <p style="margin-top:12px;">
+                            <button type="button" class="button" id="jase-settings-disconnect-gsc">Disconnect</button>
+                        </p>
+                    <?php elseif ( $is_connected ) : ?>
+                        <div class="jase-gsc-status-badge is-connected">
+                            <span class="dashicons dashicons-yes-alt"></span>
+                            Connected (no site selected yet &mdash; select a site in the Generate Posts wizard)
+                        </div>
+                        <p style="margin-top:12px;">
+                            <button type="button" class="button" id="jase-settings-disconnect-gsc">Disconnect</button>
+                        </p>
+                    <?php else : ?>
+                        <div class="jase-gsc-status-badge is-disconnected">
+                            <span class="dashicons dashicons-warning"></span>
+                            Not connected
+                        </div>
+                        <p class="description" style="margin-top:8px;">
+                            Save your Google OAuth credentials above first, then connect via the
+                            <a href="<?php echo esc_url( admin_url( 'admin.php?page=justautomateseo' ) ); ?>">Generate Posts</a> wizard.
+                        </p>
+                    <?php endif; ?>
+                </div>
+                <div class="jase-help-box">
+                    <strong>How to set up Google Search Console OAuth:</strong>
+                    <ol>
+                        <li>Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Google Cloud Console &rarr; Credentials</a></li>
+                        <li>Create an OAuth 2.0 Client ID (Web application type)</li>
+                        <li>Add <code><?php echo esc_html( admin_url( 'admin.php?page=justautomateseo&gsc_callback=1' ) ); ?></code> as an Authorized redirect URI</li>
+                        <li>Enable the <a href="https://console.cloud.google.com/apis/library/searchconsole.googleapis.com" target="_blank" rel="noopener">Search Console API</a> in your project</li>
+                        <li>Copy the Client ID and Client Secret into the API Keys section above</li>
+                    </ol>
+                </div>
+            </div>
+
+            <!-- Section 3: Sitemap & Internal Linking -->
+            <div class="jase-settings-card">
+                <h2>Sitemap &amp; Internal Linking</h2>
+                <p class="description">Provide your post sitemap URL so generated articles include relevant internal links.</p>
+                <table class="form-table">
+                    <tr>
+                        <th><label for="jase-settings-sitemap-url">Post Sitemap URL</label></th>
+                        <td>
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <input type="url" id="jase-settings-sitemap-url" class="regular-text"
+                                    value="<?php echo esc_attr( $settings['sitemap_url'] ?? '' ); ?>"
+                                    placeholder="https://yoursite.com/post-sitemap.xml" />
+                                <button type="button" class="button" id="jase-settings-validate-sitemap">Validate</button>
+                            </div>
+                            <div id="jase-settings-sitemap-result" style="margin-top:8px;"></div>
+                            <p class="description" style="margin-top:8px;">
+                                Common sitemap locations:<br>
+                                &bull; <strong>Yoast SEO:</strong> <code>/post-sitemap.xml</code><br>
+                                &bull; <strong>Rank Math:</strong> <code>/sitemap_index.xml</code><br>
+                                &bull; <strong>WordPress default:</strong> <code>/wp-sitemap-posts-post-1.xml</code><br>
+                                <a href="https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap" target="_blank" rel="noopener">Learn about sitemaps &rarr;</a>
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Section 4: Content Defaults -->
+            <div class="jase-settings-card">
+                <h2>Content Defaults</h2>
+                <p class="description">Default settings for generated content. These are used when generating posts and can be overridden during generation.</p>
+                <table class="form-table">
+                    <tr>
+                        <th><label for="jase-settings-post-status">Post Status</label></th>
+                        <td>
+                            <select id="jase-settings-post-status">
+                                <option value="draft" <?php selected( $default_status, 'draft' ); ?>>Draft</option>
+                                <option value="publish" <?php selected( $default_status, 'publish' ); ?>>Published</option>
+                                <option value="pending" <?php selected( $default_status, 'pending' ); ?>>Pending Review</option>
+                            </select>
+                            <p class="description">New posts will be created with this status by default.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label for="jase-settings-image-mode">Featured Images</label></th>
+                        <td>
+                            <select id="jase-settings-image-mode">
+                                <option value="auto" <?php selected( $default_image, 'auto' ); ?>>Automatic (AI Generated via DALL-E)</option>
+                                <option value="manual" <?php selected( $default_image, 'manual' ); ?>>Manual Upload (add later)</option>
+                                <option value="none" <?php selected( $default_image, 'none' ); ?>>No Featured Image</option>
+                            </select>
+                            <p class="description">How featured images are handled for generated posts.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label for="jase-settings-category">Default Category</label></th>
+                        <td>
+                            <select id="jase-settings-category">
+                                <option value="0">Uncategorized</option>
+                                <?php foreach ( $categories as $cat ) : ?>
+                                    <option value="<?php echo esc_attr( $cat->term_id ); ?>"
+                                        <?php selected( $default_cat, $cat->term_id ); ?>>
+                                        <?php echo esc_html( $cat->name ); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <p class="description">Default category for generated posts.</p>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            <p style="margin-top:20px;">
+                <button type="button" class="button button-primary button-hero" id="jase-save-settings">Save All Settings</button>
+                <span class="jase-save-spinner spinner"></span>
+            </p>
         </div>
         <?php
     }
 
     public function render_wizard_page() {
-        $categories = get_categories( [ 'hide_empty' => false ] );
+        $categories     = get_categories( [ 'hide_empty' => false ] );
+        $setup_complete = get_option( 'jase_setup_complete', false );
         ?>
         <div class="wrap jase-wrap">
             <div class="jase-header">
-                <h1>JustAutomateSEO</h1>
-                <p class="jase-subtitle">AI-Powered SEO Content Automation</p>
+                <?php if ( $setup_complete ) : ?>
+                    <h1>Generate Posts</h1>
+                    <p class="jase-subtitle">Create new SEO-optimized content</p>
+                <?php else : ?>
+                    <h1>JustAutomateSEO</h1>
+                    <p class="jase-subtitle">AI-Powered SEO Content Automation</p>
+                <?php endif; ?>
             </div>
 
             <div class="jase-wizard">

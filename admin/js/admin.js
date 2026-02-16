@@ -30,6 +30,19 @@
                 $('#jase-gsc-connected').show();
                 this.loadGSCSites();
             }
+
+            // If setup is complete, adjust wizard flow (skip steps 4-5)
+            if (jaseAdmin.setupComplete) {
+                this.adjustWizardForPostSetup();
+            }
+
+            // Pre-fill step 6 with settings defaults
+            if (jaseAdmin.defaultPostStatus) {
+                $('#jase-post-status').val(jaseAdmin.defaultPostStatus);
+            }
+            if (jaseAdmin.defaultCategory) {
+                $('#jase-category').val(jaseAdmin.defaultCategory);
+            }
         },
 
         bindEvents: function() {
@@ -92,6 +105,12 @@
 
             // Settings save
             $('#jase-save-settings').on('click', function() { self.saveSettings(); });
+
+            // Settings page - Sitemap validation
+            $('#jase-settings-validate-sitemap').on('click', function() { self.validateSitemapSettings(); });
+
+            // Settings page - GSC disconnect
+            $('#jase-settings-disconnect-gsc').on('click', function() { self.disconnectGSC(); });
         },
 
         initAccordions: function() {
@@ -103,6 +122,19 @@
             });
             // Open first step
             this.openStep(1);
+        },
+
+        adjustWizardForPostSetup: function() {
+            // Hide steps 4 (Sitemap) and 5 (Images) when setup is already complete
+            $('.jase-accordion[data-step="4"], .jase-accordion[data-step="5"]').hide();
+
+            // Change step 3's "Continue to Sitemap Setup" button to go directly to step 6
+            $('.jase-accordion[data-step="3"] .jase-next-step').text('Continue to Content Generation').data('next', 6);
+
+            // Pre-select image mode from settings
+            if (jaseAdmin.defaultImageMode) {
+                $('input[name="jase_image_mode"][value="' + jaseAdmin.defaultImageMode + '"]').prop('checked', true);
+            }
         },
 
         toggleStep: function(step) {
@@ -517,7 +549,13 @@
 
             var self = this;
             var questions = this.selectedQuestions.slice();
+
+            // Get image mode - use checked radio or fall back to settings default
             var imageMode = $('input[name="jase_image_mode"]:checked').val();
+            if (!imageMode && jaseAdmin.defaultImageMode) {
+                imageMode = jaseAdmin.defaultImageMode;
+            }
+
             var categoryId = $('#jase-category').val();
             var postStatus = $('#jase-post-status').val();
             var total = questions.length;
@@ -617,7 +655,11 @@
             var data = {
                 openai_api_key: $('#openai_api_key').val(),
                 gsc_client_id: $('#gsc_client_id').val(),
-                gsc_client_secret: $('#gsc_client_secret').val()
+                gsc_client_secret: $('#gsc_client_secret').val(),
+                sitemap_url: $('#jase-settings-sitemap-url').val(),
+                default_post_status: $('#jase-settings-post-status').val(),
+                default_image_mode: $('#jase-settings-image-mode').val(),
+                default_category: $('#jase-settings-category').val()
             };
 
             $('.jase-save-spinner').addClass('is-active');
@@ -627,6 +669,41 @@
                 alert('Settings saved successfully!');
             }, function() {
                 $('.jase-save-spinner').removeClass('is-active');
+            });
+        },
+
+        validateSitemapSettings: function() {
+            var url = $('#jase-settings-sitemap-url').val().trim();
+            if (!url) {
+                alert('Please enter a sitemap URL');
+                return;
+            }
+
+            var self = this;
+            $('#jase-settings-sitemap-result').html('<span style="color:#64748b;">Validating...</span>');
+
+            this.ajaxPost('jase_validate_sitemap', { sitemap_url: url }, function(data) {
+                $('#jase-settings-sitemap-result').html(
+                    '<div class="jase-success-badge" style="margin:0;">' +
+                        '<span class="dashicons dashicons-yes-alt"></span> ' +
+                        'Sitemap valid - ' + data.url_count + ' URLs found' +
+                    '</div>'
+                );
+            }, function() {
+                $('#jase-settings-sitemap-result').html(
+                    '<div style="color:#dc2626;font-weight:600;">Failed to validate sitemap. Please check the URL.</div>'
+                );
+            });
+        },
+
+        disconnectGSC: function() {
+            if (!confirm('Are you sure you want to disconnect from Google Search Console?')) {
+                return;
+            }
+
+            this.ajaxPost('jase_gsc_disconnect', {}, function() {
+                alert('Disconnected successfully. Refreshing page...');
+                window.location.reload();
             });
         },
 
