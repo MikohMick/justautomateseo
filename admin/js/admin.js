@@ -91,6 +91,9 @@
 
             // Step 4: Sitemap
             $('#jase-validate-sitemap').on('click', function() { self.validateSitemap(); });
+            $('#jase-skip-sitemap').on('click', function() {
+                $('#jase-skip-sitemap-warning').slideToggle(300);
+            });
 
             // Step 6: Generate
             $('#jase-generate-content').on('click', function() { self.generateContent(); });
@@ -577,11 +580,12 @@
 
             function generateNext() {
                 if (current >= total) {
-                    // All done
+                    // All done - keep step open so users can click Edit Post links
                     $('#jase-gen-loading').hide();
                     $('#jase-generate-content').prop('disabled', false);
+                    $('#jase-progress-fill').css('width', '100%');
+                    $('#jase-progress-text').text('All ' + total + ' articles generated! Click "Edit Post" to review your content.');
                     if (successCount > 0) {
-                        self.completeStep(6);
                         update_option_complete();
                     }
                     return;

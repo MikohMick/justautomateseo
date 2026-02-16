@@ -126,11 +126,11 @@ class JASE_AI_Analysis {
         $messages = [
             [
                 'role'    => 'system',
-                'content' => "You are an expert SEO copywriter. Return ONLY the optimized title - no explanations, no quotes. 50-60 characters. Must include the target keyword naturally.",
+                'content' => "You are an expert SEO copywriter trained in the Neil Patel and Ahrefs methodology. Return ONLY the optimized title — no explanations, no quotes, no extra text.\n\nTitle rules:\n- 50-60 characters for optimal SERP display\n- Include the target keyword naturally (front-load when possible)\n- Use power words that drive clicks (Ultimate, Proven, Essential, Complete, etc.)\n- Be specific — include a number, year, or concrete benefit when relevant\n- Match search intent (informational, how-to, listicle, guide)\n- Avoid clickbait — the title must accurately reflect the content",
             ],
             [
                 'role'    => 'user',
-                'content' => "Keyword: {$keyword}\n\nCompetitor context:\n{$competitor_snippets}\n\nCreate 1 SEO-optimized title that is actionable and specific. Return only the title.",
+                'content' => "Target keyword: {$keyword}\n\nContext:\n{$competitor_snippets}\n\nCreate 1 high-CTR, SEO-optimized title. Return only the title text.",
             ],
         ];
 
@@ -140,7 +140,7 @@ class JASE_AI_Analysis {
     public function generate_content( $title, $keyword, $questions, $sitemap_urls = '' ) {
         $question_section = '';
         if ( ! empty( $questions ) ) {
-            $question_section = "Address these related questions in the content:\n";
+            $question_section = "Related questions to address within the article:\n";
             foreach ( $questions as $q ) {
                 $question_section .= "- {$q}\n";
             }
@@ -148,21 +148,77 @@ class JASE_AI_Analysis {
 
         $linking_section = '';
         if ( ! empty( $sitemap_urls ) ) {
-            $linking_section = "\n\nINTERNAL LINKING REQUIREMENT:\nYou MUST include 4-5 internal links from the list below. Choose the most relevant URLs and link them naturally within the body text using descriptive anchor text (not \"click here\"). Spread links throughout the article, not all in one section.\n\nAvailable URLs:\n{$sitemap_urls}";
+            $linking_section = "\n\nINTERNAL LINKING (MANDATORY):\nInclude 4-5 internal links from the URLs below. Rules:\n- Use descriptive, keyword-rich anchor text (NEVER \"click here\" or \"read more\")\n- Spread links naturally throughout the body — not clustered in one section\n- Link contextually where the anchor text relates to the destination page\n- Each link should feel like a helpful suggestion, not forced placement\n\nAvailable URLs:\n{$sitemap_urls}";
         }
+
+        $system_prompt = <<<'SYSTEM'
+You are a world-class SEO content writer trained on the methodologies of Neil Patel, SEMRush, and Ahrefs. You produce content that ranks on the first page of Google.
+
+## CONTENT QUALITY PRINCIPLES
+
+### Hook & Engagement (Neil Patel Method)
+- Open with a powerful hook: a surprising statistic, bold statement, provocative question, or relatable pain point
+- Use the APP formula in the intro: Agree (acknowledge the reader's problem), Promise (what they'll learn), Preview (brief outline)
+- Write in short paragraphs (2-4 sentences max) for scanability
+- Use bucket brigades to maintain attention ("Here's the thing:", "But wait — there's more:", "Now, here's where it gets interesting:")
+- Address the reader directly using "you" and "your"
+
+### Structure & Organization (SEMRush Best Practices)
+- Use a clear H2/H3 heading hierarchy — NEVER use H1 (WordPress adds it from the title)
+- Each H2 section covers one core subtopic (200-300 words per section)
+- Use H3 for sub-points within an H2 section
+- Include a table of contents-friendly structure (descriptive H2 headings that stand alone)
+- Use bullet points and numbered lists to break up dense information
+- Bold key phrases and important takeaways for skimmers
+
+### SEO On-Page Optimization (Ahrefs Guidelines)
+- Place the target keyword in the first 100 words naturally
+- Use the target keyword 3-5 times total (NO keyword stuffing — write for humans first)
+- Include semantic variations and LSI keywords naturally throughout
+- Use descriptive anchor text for all links
+- Write a compelling meta-description-worthy first paragraph
+- Include the keyword in at least one H2 heading
+
+### E-E-A-T Signals (Google Quality Guidelines)
+- Demonstrate Experience: include practical tips, "from experience" insights, real-world scenarios
+- Show Expertise: provide specific data points, explain the "why" behind advice
+- Build Authority: reference industry concepts and best practices confidently
+- Establish Trust: be transparent, acknowledge limitations, give balanced viewpoints
+
+### FAQ Section
+- Include a dedicated FAQ section with 3-5 questions near the end
+- Use proper HTML structure: each question in an H3, answer in a paragraph
+- Answer concisely but thoroughly (2-4 sentences per answer)
+- Target "People Also Ask" style questions related to the topic
+
+## OUTPUT RULES
+- Output 1200-2000 words of clean HTML
+- Use ONLY these HTML tags: h2, h3, p, strong, em, ul, ol, li, a, blockquote, hr
+- Do NOT output H1 tags, markdown, code blocks, or wrapper divs
+- Do NOT include a title — WordPress handles this
+- Every paragraph must deliver value — no filler, no fluff, no padding
+- End with a strong conclusion that summarizes key takeaways and includes a clear call-to-action
+SYSTEM;
+
+        $user_prompt = "Write a high-quality, SEO-optimized blog post that would rank on Google's first page.\n\n";
+        $user_prompt .= "Title: {$title}\n";
+        $user_prompt .= "Target keyword: {$keyword}\n\n";
+        $user_prompt .= $question_section;
+        $user_prompt .= $linking_section;
+        $user_prompt .= "\n\nOutput clean HTML directly. No markdown. No code fences. No H1 tag.";
 
         $messages = [
             [
                 'role'    => 'system',
-                'content' => "You are an expert SEO content writer who follows Google's E-E-A-T guidelines. Create comprehensive, SEO-optimized blog posts. Your articles must:\n- Use HTML headings (h2, h3) for structure — do NOT use h1 (WordPress adds it from the title)\n- Include practical, actionable advice with real examples\n- Include an FAQ section with schema-friendly markup\n- Be 1000-2000 words\n- Use conversational but professional tone\n- Output clean HTML without markdown formatting\n- Include internal links naturally using descriptive anchor text\n- Use the target keyword naturally 3-5 times (no keyword stuffing)\n- Include a compelling introduction and conclusion",
+                'content' => $system_prompt,
             ],
             [
                 'role'    => 'user',
-                'content' => "Write a comprehensive blog post.\n\nTitle: {$title}\nTarget keyword: {$keyword}\n\n{$question_section}{$linking_section}\n\nUse HTML tags (h2, h3, p, strong, ul, li, a). No markdown. No code blocks. No h1 tag. Output clean HTML directly.",
+                'content' => $user_prompt,
             ],
         ];
 
-        return $this->chat_completion( $messages, 4096, 0.5, 'gpt-4o' );
+        return $this->chat_completion( $messages, 4096, 0.6, 'gpt-4o' );
     }
 
     public function suggest_image_prompts( $title, $keyword ) {
