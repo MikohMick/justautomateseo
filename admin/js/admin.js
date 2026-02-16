@@ -11,6 +11,9 @@
         allKeywords: [],
 
         init: function() {
+            // Move other plugin admin notices outside our interface
+            this.relocateNotices();
+
             this.bindEvents();
             this.initAccordions();
 
@@ -91,20 +94,6 @@
 
             // Step 4: Sitemap
             $('#jase-validate-sitemap').on('click', function() { self.validateSitemap(); });
-            $(document).on('click', '#jase-skip-sitemap', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                var $warning = $('#jase-skip-sitemap-warning');
-                if ($warning.is(':visible')) {
-                    $warning.slideUp(300);
-                } else {
-                    $warning.slideDown(300, function() {
-                        $('html, body').animate({
-                            scrollTop: $warning.offset().top - 100
-                        }, 300);
-                    });
-                }
-            });
 
             // Step 6: Generate
             $('#jase-generate-content').on('click', function() { self.generateContent(); });
@@ -723,6 +712,22 @@
         },
 
         // ==================== Utilities ====================
+        relocateNotices: function() {
+            // Move other plugin notices (SureMail, etc.) outside our plugin wrappers
+            var $wrapper = $('.jase-wrap, .jase-settings-wrap').first();
+            if (!$wrapper.length) return;
+
+            $wrapper.find('.notice, .updated, .error, .update-nag, .is-dismissible, [class*="notice-"]').each(function() {
+                // Only move notices that are NOT ours
+                if (!$(this).hasClass('jase-success-badge') && !$(this).hasClass('jase-cannibal-warning')) {
+                    $(this).insertBefore($wrapper);
+                }
+            });
+
+            // Also catch notices that WordPress injects right after our wrapper's first h1/h2
+            $wrapper.siblings('.notice, .updated, .error, .update-nag').insertBefore($wrapper);
+        },
+
         ajaxPost: function(action, data, success, error, timeout) {
             data = data || {};
             data.action = action;

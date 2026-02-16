@@ -511,25 +511,21 @@ class JASE_Admin {
                                 </button>
                             </div>
                             <div style="margin-top:16px;border-top:1px solid #e5e7eb;padding-top:16px;">
-                                <button type="button" class="button jase-btn" id="jase-skip-sitemap">
-                                    Skip &mdash; I don't need internal linking
-                                </button>
-                                <div id="jase-skip-sitemap-warning" style="display:none;">
-                                    <div class="jase-cannibal-warning" style="margin-top:12px;">
-                                        <span class="dashicons dashicons-warning"></span>
-                                        <div>
-                                            <p><strong>No internal linking:</strong> Generated articles will not contain links to your existing content. Internal links help:</p>
-                                            <ul style="margin:8px 0 8px 20px;font-size:13px;color:#92400e;">
-                                                <li>Search engines discover and index your pages</li>
-                                                <li>Distribute page authority across your site</li>
-                                                <li>Keep readers engaged with related content</li>
-                                                <li>Improve overall site SEO performance</li>
-                                            </ul>
-                                            <p>You can always add a sitemap later in <strong>Settings &rarr; Sitemap &amp; Internal Linking</strong>.</p>
-                                            <button type="button" class="button button-primary jase-btn jase-next-step" data-next="5" style="margin-top:8px;">
-                                                Continue without internal linking <span class="dashicons dashicons-arrow-right-alt"></span>
-                                            </button>
-                                        </div>
+                                <p style="font-size:14px;font-weight:600;color:#1e293b;margin:0 0 8px;">Don't have a sitemap?</p>
+                                <div class="jase-cannibal-warning">
+                                    <span class="dashicons dashicons-warning"></span>
+                                    <div>
+                                        <p><strong>Skipping internal linking:</strong> Generated articles will not contain links to your existing content. Internal links help:</p>
+                                        <ul style="margin:8px 0 8px 20px;font-size:13px;color:#92400e;">
+                                            <li>Search engines discover and index your pages</li>
+                                            <li>Distribute page authority across your site</li>
+                                            <li>Keep readers engaged with related content</li>
+                                            <li>Improve overall site SEO performance</li>
+                                        </ul>
+                                        <p>You can always add a sitemap later in <strong>Settings &rarr; Sitemap &amp; Internal Linking</strong>.</p>
+                                        <button type="button" class="button button-primary jase-btn jase-next-step" data-next="5" style="margin-top:8px;">
+                                            Continue without internal linking <span class="dashicons dashicons-arrow-right-alt"></span>
+                                        </button>
                                     </div>
                                 </div>
                             </div>
