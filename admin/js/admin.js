@@ -34,9 +34,25 @@
                 this.loadGSCSites();
             }
 
-            // If setup is complete, adjust wizard flow (skip steps 4-5)
+            // If setup is complete, adjust wizard flow
             if (jaseAdmin.setupComplete) {
                 this.adjustWizardForPostSetup();
+            }
+
+            // Auto-skip steps with defaults from settings
+            if (jaseAdmin.sitemapUrl) {
+                // Sitemap already configured, mark step 4 as complete
+                $('.jase-accordion[data-step="4"]').addClass('is-complete');
+                $('.jase-accordion[data-step="4"] .jase-next-step').first().after(
+                    '<p style="margin-top:12px;font-size:13px;color:#64748b;">Using sitemap from Settings: <strong>' +
+                    jaseAdmin.sitemapUrl + '</strong></p>'
+                );
+            }
+
+            if (jaseAdmin.defaultImageMode) {
+                // Image mode already configured, mark step 5 as complete
+                $('.jase-accordion[data-step="5"]').addClass('is-complete');
+                $('input[name="jase_image_mode"][value="' + jaseAdmin.defaultImageMode + '"]').prop('checked', true);
             }
 
             // Pre-fill step 6 with settings defaults
@@ -128,16 +144,9 @@
         },
 
         adjustWizardForPostSetup: function() {
-            // Hide steps 4 (Sitemap) and 5 (Images) when setup is already complete
-            $('.jase-accordion[data-step="4"], .jase-accordion[data-step="5"]').hide();
-
-            // Change step 3's "Continue to Sitemap Setup" button to go directly to step 6
-            $('.jase-accordion[data-step="3"] .jase-next-step').text('Continue to Content Generation').data('next', 6);
-
-            // Pre-select image mode from settings
-            if (jaseAdmin.defaultImageMode) {
-                $('input[name="jase_image_mode"][value="' + jaseAdmin.defaultImageMode + '"]').prop('checked', true);
-            }
+            // After first setup, auto-skip steps 4-5 if already configured in settings
+            // Step 3 continues to next sequential step (4 or 5) instead of jumping to 6
+            // This allows users to update sitemap/images if they want, but doesn't force them
         },
 
         toggleStep: function(step) {

@@ -94,18 +94,66 @@ class JASE_AI_Analysis {
             }
         }
 
+        $system_prompt = <<<'SYSTEM'
+You are an SEO content strategist trained on Neil Patel, SEMRush, and Ahrefs methodologies. Analyze questions from Google Autocomplete and score them for content creation potential.
+
+## RANKING CRITERIA (SEMRush/Ahrefs/Neil Patel Framework)
+
+### High-Scoring Question Types (8-10/10):
+1. **"How to" questions** - Actionable, tutorial potential, aligns with informational intent
+   - "how to start a blog", "how to lose weight fast"
+
+2. **"What is/are" questions** - Definitional, comprehensive guide potential, often featured snippet targets
+   - "what is SEO", "what are backlinks"
+
+3. **"Why" questions** - Explanation-driven, builds authority, addresses pain points
+   - "why does my website load slowly", "why is content marketing important"
+
+4. **Comparison questions** - "vs", "or", "compared to" - High commercial intent, comprehensive content
+   - "Ahrefs vs SEMrush", "WordPress or Wix"
+
+5. **Listicle-style** - "top 5", "top 10", "best", "checklist" - High CTR, scannable, shareable
+   - "top 10 SEO tools", "best practices for email marketing"
+
+6. **"Which/When/Where" questions** - Specific intent, practical advice
+   - "which keyword research tool is best", "when to publish blog posts"
+
+### Medium-Scoring (5-7/10):
+- Single-word modifiers without clear intent ("keyword tips", "SEO tools")
+- Broad questions lacking specificity ("how to do marketing")
+- Niche questions with limited content expansion potential
+
+### Low-Scoring (1-4/10):
+- Extremely narrow/local questions ("pizza near me")
+- Vague questions without clear search intent
+- Questions requiring real-time data ("today's weather")
+
+## SCORING FACTORS:
+- **Content depth potential** (can we write 1000-2000 words?)
+- **Search intent clarity** (informational > transactional for blog content)
+- **Featured snippet opportunity** (definitional, how-to, comparison)
+- **Keyword specificity** (specific > broad)
+- **Commercial viability** (does this attract target audience?)
+
+Return ONLY valid JSON with the top 5 questions, sorted by score descending.
+SYSTEM;
+
+        $user_prompt = "Keyword: \"{$keyword}\"\n\n";
+        $user_prompt .= "Questions from Google Autocomplete:\n{$question_list}\n\n";
+        $user_prompt .= 'Analyze and return the top 5 questions as JSON: [{"text":"question","score":8,"reasoning":"brief reason citing SEO principles","volume":0}]';
+
         $messages = [
             [
                 'role'    => 'system',
-                'content' => 'You are an SEO content strategist. Analyze questions from Google Autocomplete for a keyword and return ONLY valid JSON. Score questions 1-10 based on: content potential, user intent clarity, ability to create comprehensive answers, and specificity.',
+                'content' => $system_prompt,
             ],
             [
                 'role'    => 'user',
-                'content' => "For the keyword \"{$keyword}\", these are real Google Autocomplete questions. Analyze and return the best 5 as JSON:\n\n{$question_list}\n\nReturn ONLY a JSON array like: [{\"text\":\"question\",\"score\":8,\"reasoning\":\"brief reason\",\"volume\":0}]",
+                'content' => $user_prompt,
             ],
         ];
 
-        $result = $this->chat_completion( $messages, 1024, 0.3 );
+        $result = $this->chat_completion( $messages, 1536, 0.4, 'gpt-4o-mini' );
         if ( is_wp_error( $result ) ) {
             return $result;
         }
