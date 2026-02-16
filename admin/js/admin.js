@@ -91,8 +91,19 @@
 
             // Step 4: Sitemap
             $('#jase-validate-sitemap').on('click', function() { self.validateSitemap(); });
-            $('#jase-skip-sitemap').on('click', function() {
-                $('#jase-skip-sitemap-warning').slideToggle(300);
+            $(document).on('click', '#jase-skip-sitemap', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                var $warning = $('#jase-skip-sitemap-warning');
+                if ($warning.is(':visible')) {
+                    $warning.slideUp(300);
+                } else {
+                    $warning.slideDown(300, function() {
+                        $('html, body').animate({
+                            scrollTop: $warning.offset().top - 100
+                        }, 300);
+                    });
+                }
             });
 
             // Step 6: Generate
