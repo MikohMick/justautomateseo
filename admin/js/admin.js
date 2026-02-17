@@ -39,16 +39,6 @@
                 this.adjustWizardForPostSetup();
             }
 
-            // Auto-skip steps with defaults from settings
-            if (jaseAdmin.sitemapUrl) {
-                // Sitemap already configured, mark step 4 as complete
-                $('.jase-accordion[data-step="4"]').addClass('is-complete');
-                $('.jase-accordion[data-step="4"] .jase-next-step').first().after(
-                    '<p style="margin-top:12px;font-size:13px;color:#64748b;">Using sitemap from Settings: <strong>' +
-                    jaseAdmin.sitemapUrl + '</strong></p>'
-                );
-            }
-
             if (jaseAdmin.defaultImageMode) {
                 // Image mode already configured, mark step 5 as complete
                 $('.jase-accordion[data-step="5"]').addClass('is-complete');
@@ -110,6 +100,15 @@
 
             // Step 4: Sitemap
             $('#jase-validate-sitemap').on('click', function() { self.validateSitemap(); });
+            $(document).on('click', '#jase-skip-sitemap-preconfigured', function() {
+                self.completeStep(4);
+                self.openStep(5);
+            });
+            $(document).on('click', '#jase-change-sitemap', function() {
+                $('#jase-sitemap-preconfigured').slideUp(300, function() {
+                    $('#jase-sitemap-setup').slideDown(300);
+                });
+            });
 
             // Step 6: Generate
             $('#jase-generate-content').on('click', function() { self.generateContent(); });

@@ -492,40 +492,68 @@ class JASE_Admin {
                     </div>
                     <div class="jase-accordion-body" data-step="4">
                         <div class="jase-step-content">
-                            <p>Provide your post sitemap XML URL so we can add relevant internal links to your generated content.</p>
-                            <div class="jase-filter-row">
-                                <input type="url" id="jase-sitemap-url" class="regular-text" placeholder="https://yoursite.com/post-sitemap.xml"
-                                    value="<?php echo esc_attr( JASE_Settings::get( 'sitemap_url', '' ) ); ?>" />
-                                <button type="button" class="button button-primary jase-btn" id="jase-validate-sitemap">
-                                    Validate Sitemap
-                                </button>
+                            <?php $saved_sitemap = JASE_Settings::get( 'sitemap_url', '' ); ?>
+
+                            <!-- Show when sitemap is already configured in Settings -->
+                            <div id="jase-sitemap-preconfigured" style="<?php echo $saved_sitemap ? '' : 'display:none;'; ?>">
+                                <div class="jase-success-badge">
+                                    <span class="dashicons dashicons-yes-alt"></span>
+                                    Sitemap configured: <strong id="jase-sitemap-saved-url"><?php echo esc_html( $saved_sitemap ); ?></strong>
+                                </div>
+                                <p style="margin:12px 0 16px;font-size:13px;color:#64748b;">
+                                    Your sitemap is saved in Settings. Generated articles will include internal links to your existing content.
+                                    You can update it anytime in <strong>Settings &rarr; Sitemap &amp; Internal Linking</strong>.
+                                </p>
+                                <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                                    <button type="button" class="button button-primary jase-btn jase-next-step" data-next="5">
+                                        Use Internal Linking <span class="dashicons dashicons-arrow-right-alt"></span>
+                                    </button>
+                                    <button type="button" class="button jase-btn" id="jase-skip-sitemap-preconfigured">
+                                        Skip Internal Linking <span class="dashicons dashicons-arrow-right-alt"></span>
+                                    </button>
+                                    <button type="button" class="button jase-btn" id="jase-change-sitemap" style="color:#64748b;">
+                                        Change Sitemap URL
+                                    </button>
+                                </div>
                             </div>
-                            <div class="jase-spinner-wrap" id="jase-sitemap-loading" style="display:none;">
-                                <div class="jase-spinner"></div>
-                                <p>Validating sitemap...</p>
-                            </div>
-                            <div id="jase-sitemap-result" style="display:none;"></div>
-                            <div id="jase-sitemap-confirmed" style="display:none;">
-                                <button type="button" class="button button-primary jase-btn jase-next-step" data-next="5">
-                                    Continue to Image Options <span class="dashicons dashicons-arrow-right-alt"></span>
-                                </button>
-                            </div>
-                            <div style="margin-top:16px;border-top:1px solid #e5e7eb;padding-top:16px;">
-                                <p style="font-size:14px;font-weight:600;color:#1e293b;margin:0 0 8px;">Don't have a sitemap?</p>
-                                <div class="jase-cannibal-warning">
-                                    <span class="dashicons dashicons-warning"></span>
-                                    <div>
-                                        <p><strong>Skipping internal linking:</strong> Generated articles will not contain links to your existing content. Internal links help:</p>
-                                        <ul style="margin:8px 0 8px 20px;font-size:13px;color:#92400e;">
-                                            <li>Search engines discover and index your pages</li>
-                                            <li>Distribute page authority across your site</li>
-                                            <li>Keep readers engaged with related content</li>
-                                            <li>Improve overall site SEO performance</li>
-                                        </ul>
-                                        <p>You can always add a sitemap later in <strong>Settings &rarr; Sitemap &amp; Internal Linking</strong>.</p>
-                                        <button type="button" class="button button-primary jase-btn jase-next-step" data-next="5" style="margin-top:8px;">
-                                            Continue without internal linking <span class="dashicons dashicons-arrow-right-alt"></span>
-                                        </button>
+
+                            <!-- Show when no sitemap is configured -->
+                            <div id="jase-sitemap-setup" style="<?php echo $saved_sitemap ? 'display:none;' : ''; ?>">
+                                <p>Provide your post sitemap XML URL so we can add relevant internal links to your generated content.</p>
+                                <div class="jase-filter-row">
+                                    <input type="url" id="jase-sitemap-url" class="regular-text" placeholder="https://yoursite.com/post-sitemap.xml"
+                                        value="<?php echo esc_attr( $saved_sitemap ); ?>" />
+                                    <button type="button" class="button button-primary jase-btn" id="jase-validate-sitemap">
+                                        Validate Sitemap
+                                    </button>
+                                </div>
+                                <div class="jase-spinner-wrap" id="jase-sitemap-loading" style="display:none;">
+                                    <div class="jase-spinner"></div>
+                                    <p>Validating sitemap...</p>
+                                </div>
+                                <div id="jase-sitemap-result" style="display:none;"></div>
+                                <div id="jase-sitemap-confirmed" style="display:none;">
+                                    <button type="button" class="button button-primary jase-btn jase-next-step" data-next="5">
+                                        Continue to Image Options <span class="dashicons dashicons-arrow-right-alt"></span>
+                                    </button>
+                                </div>
+                                <div style="margin-top:16px;border-top:1px solid #e5e7eb;padding-top:16px;">
+                                    <p style="font-size:14px;font-weight:600;color:#1e293b;margin:0 0 8px;">Don't have a sitemap?</p>
+                                    <div class="jase-cannibal-warning">
+                                        <span class="dashicons dashicons-warning"></span>
+                                        <div>
+                                            <p><strong>Skipping internal linking:</strong> Generated articles will not contain links to your existing content. Internal links help:</p>
+                                            <ul style="margin:8px 0 8px 20px;font-size:13px;color:#92400e;">
+                                                <li>Search engines discover and index your pages</li>
+                                                <li>Distribute page authority across your site</li>
+                                                <li>Keep readers engaged with related content</li>
+                                                <li>Improve overall site SEO performance</li>
+                                            </ul>
+                                            <p>You can always add a sitemap later in <strong>Settings &rarr; Sitemap &amp; Internal Linking</strong>.</p>
+                                            <button type="button" class="button button-primary jase-btn jase-next-step" data-next="5" style="margin-top:8px;">
+                                                Continue without internal linking <span class="dashicons dashicons-arrow-right-alt"></span>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

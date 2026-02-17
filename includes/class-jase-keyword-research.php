@@ -64,6 +64,7 @@ class JASE_Keyword_Research {
      */
     public function get_questions( $keyword, $location = 'US', $lang = 'en' ) {
         $prefixes = [
+            // Informational intent (How-to, definitional)
             'how to ',
             'what is ',
             'what are ',
@@ -75,6 +76,14 @@ class JASE_Keyword_Research {
             'can ',
             'does ',
             'is ',
+            // Listicle & ranking formats (high CTR - SEMrush/Neil Patel)
+            'top 5 ',
+            'top 10 ',
+            'best ',
+            // Comparison & commercial intent (Ahrefs methodology)
+            $keyword . ' vs ',
+            $keyword . ' or ',
+            $keyword . ' compared to ',
         ];
 
         $all_questions = [];
